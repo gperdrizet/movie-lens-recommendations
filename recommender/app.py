@@ -5,19 +5,28 @@ from pathlib import Path
 
 import pickle
 import subprocess
+import pandas as pd
 import streamlit as st
 
-DATA_PATH = 'data/matricies.pkl'
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+DATA_PATH = PROJECT_ROOT / 'data/matricies.pkl'
+GENERATOR_PATH = Path(__file__).with_name('generate_data.py')
 
 @st.cache_resource
 def get_data():
 
-    if not Path(DATA_PATH).exists():
-        with st.spinner("Generating data artifacts...", show_time=True):
-            subprocess.run([sys.executable], DATA_PATH, check=True)
+    if Path(DATA_PATH).exists():
+        with open(DATA_PATH, 'rb') as file:
+            data = pickle.load(file)
 
-    with open(DATA_PATH, 'rb') as f:
-        return pickle.load(f)
+        if 'movies' in data:
+            return data
+
+    with st.spinner("Generating data artifacts...", show_time=True):
+        subprocess.run([sys.executable, str(GENERATOR_PATH)], cwd=PROJECT_ROOT, check=True)
+
+    with open(DATA_PATH, 'rb') as file:
+        return pickle.load(file)
 
 
 def normalize(series):
@@ -26,6 +35,22 @@ def normalize(series):
     lo, hi = series.min(), series.max()
 
     return (series - lo) / (hi - lo) if hi > lo else series * 0
+
+
+def get_title(movie_id):
+    '''Return the movie title for a given ID.'''
+
+    result = movies.loc[movies['movie_id'] == movie_id, 'title']
+    return result.iloc[0] if not result.empty else f'Unknown ({movie_id})'
+
+
+def find_movies(query):
+    '''Return movies whose titles contain the query, ignoring case.'''
+
+    return movies.loc[
+        movies['title'].str.contains(query, case=False, regex=False, na=False),
+        ['movie_id', 'title']
+    ]
 
 
 def hybrid_recommendations(movie_id, n=5, alpha=0.5):
@@ -48,11 +73,22 @@ def hybrid_recommendations(movie_id, n=5, alpha=0.5):
 data = get_data()
 item_similarity_df = data['item_similarity_df']
 genre_similarity_df = data['genre_similarity_df']
+movies = data['movies']
 
 st.title('MovieLens Recommender')
 query = st.text_input('Movie title', placeholder='Toy Story')
 alpha = st.slider('Alpha: (0 = content based, 1 = collaborative)', min_value=0.0, max_value=1.0, value=0.5, step=0.1)
 
-if query:
-    result = hybrid_recommendations(int(query), alpha=alpha)
-    st.dataframe(result)
+if query.strip():
+    matches = find_movies(query.strip())
+
+    if matches.empty:
+        st.warning('No matching movies found.')
+    else:
+        selected_movie = st.selectbox(
+            'Choose a movie',
+            matches.itertuples(index=False),
+            format_func=lambda movie: movie.title
+        )
+        result = hybrid_recommendations(selected_movie.movie_id, alpha=alpha)
+        st.dataframe(result)

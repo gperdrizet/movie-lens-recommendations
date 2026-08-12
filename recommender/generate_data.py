@@ -112,10 +112,12 @@ def main():
 
     result = {
         'item_similarity_df': item_similarity_df,
-        'genre_similarity_df': genre_similarity_df
+        'genre_similarity_df': genre_similarity_df,
+        'movies': movies
     }
 
     return result
+
 
 if __name__ == '__main__':
     
