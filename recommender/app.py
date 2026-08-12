@@ -44,15 +44,6 @@ def get_title(movie_id):
     return result.iloc[0] if not result.empty else f'Unknown ({movie_id})'
 
 
-def find_movies(query):
-    '''Return movies whose titles contain the query, ignoring case.'''
-
-    return movies.loc[
-        movies['title'].str.contains(query, case=False, regex=False, na=False),
-        ['movie_id', 'title']
-    ]
-
-
 def hybrid_recommendations(movie_id, n=5, alpha=0.5):
     '''Return the top n movies by weighted combination of collab and content scores.'''
 
@@ -76,19 +67,16 @@ genre_similarity_df = data['genre_similarity_df']
 movies = data['movies']
 
 st.title('MovieLens Recommender')
-query = st.text_input('Movie title', placeholder='Toy Story')
+movie_options = list(movies[['movie_id', 'title']].itertuples(index=False))
+selected_movie = st.selectbox(
+    'Movie title',
+    movie_options,
+    index=None,
+    placeholder='Start typing a movie title',
+    format_func=lambda movie: movie.title
+)
 alpha = st.slider('Alpha: (0 = content based, 1 = collaborative)', min_value=0.0, max_value=1.0, value=0.5, step=0.1)
 
-if query.strip():
-    matches = find_movies(query.strip())
-
-    if matches.empty:
-        st.warning('No matching movies found.')
-    else:
-        selected_movie = st.selectbox(
-            'Choose a movie',
-            matches.itertuples(index=False),
-            format_func=lambda movie: movie.title
-        )
-        result = hybrid_recommendations(selected_movie.movie_id, alpha=alpha)
-        st.dataframe(result)
+if selected_movie:
+    result = hybrid_recommendations(selected_movie.movie_id, alpha=alpha)
+    st.dataframe(result)
