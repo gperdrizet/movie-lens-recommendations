@@ -1,13 +1,18 @@
 '''Helper script to generate hybrid filtering recommendation engine
-data aftifacts'''
+data artifacts'''
 
 import io
 import pickle
 import zipfile
+from pathlib import Path
 
 import requests
 import pandas as pd
 from sklearn.metrics.pairwise import cosine_similarity
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+DATA_PATH = PROJECT_ROOT / 'data/matrices.pkl'
 
 
 def download():
@@ -119,11 +124,17 @@ def main():
     return result
 
 
-if __name__ == '__main__':
-    
-    # Do the data asset build
-    result = main()
+def generate_data():
+    '''Build and save the recommendation data artifact.'''
 
-    # Save the result
-    with open('data/matricies.pkl', 'wb') as f:
-        pickle.dump(result, f)
+    result = main()
+    DATA_PATH.parent.mkdir(parents=True, exist_ok=True)
+
+    with open(DATA_PATH, 'wb') as file:
+        pickle.dump(result, file)
+
+    return result
+
+
+if __name__ == '__main__':
+    generate_data()

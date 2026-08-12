@@ -1,21 +1,15 @@
 '''Streamlit app for Movie Lens hybrid filtering recommendations'''
 
-import sys
-from pathlib import Path
-
 import pickle
-import subprocess
 import pandas as pd
 import streamlit as st
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DATA_PATH = PROJECT_ROOT / 'data/matricies.pkl'
-GENERATOR_PATH = Path(__file__).with_name('generate_data.py')
+from generate_data import DATA_PATH, generate_data
 
 @st.cache_resource
 def get_data():
 
-    if Path(DATA_PATH).exists():
+    if DATA_PATH.exists():
         with open(DATA_PATH, 'rb') as file:
             data = pickle.load(file)
 
@@ -23,10 +17,7 @@ def get_data():
             return data
 
     with st.spinner("Generating data artifacts...", show_time=True):
-        subprocess.run([sys.executable, str(GENERATOR_PATH)], cwd=PROJECT_ROOT, check=True)
-
-    with open(DATA_PATH, 'rb') as file:
-        return pickle.load(file)
+        return generate_data()
 
 
 def normalize(series):
