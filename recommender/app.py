@@ -67,16 +67,23 @@ def hybrid_recommendations(movie_id, n=5, alpha=0.5):
 
     return pd.DataFrame(results)
 
+# Load the data artifact once and reuse it across Streamlit reruns. The generator
+# creates the artifact if it does not exist, so the app can start from a fresh
+# clone without requiring a separate data-generation step.
 data = get_data()
+
 # Unpack the artifact once so recommendation functions can reuse the matrices
 # across Streamlit reruns.
 item_similarity_df = data['item_similarity_df']
 genre_similarity_df = data['genre_similarity_df']
 movies = data['movies']
 
+# Streamlit UI - set page title and display a select box for movie title search.
 st.title('MovieLens Recommender')
+
 # A select box limits input to MovieLens records and supports title search.
 movie_options = list(movies[['movie_id', 'title']].itertuples(index=False))
+
 selected_movie = st.selectbox(
     'Movie title',
     movie_options,
@@ -84,9 +91,13 @@ selected_movie = st.selectbox(
     placeholder='Start typing a movie title',
     format_func=lambda movie: movie.title
 )
+
+# Add a slider to set the alpha parameter for the hybrid recommendation.
 alpha = st.slider('Alpha: (0 = content based, 1 = collaborative)', min_value=0.0, max_value=1.0, value=0.5, step=0.1)
 
+# If a movie is selected, compute and display the hybrid recommendations.
 if selected_movie:
+
     # The picker returns the record, including its numeric matrix identifier.
     result = hybrid_recommendations(selected_movie.movie_id, alpha=alpha)
     st.dataframe(result)
