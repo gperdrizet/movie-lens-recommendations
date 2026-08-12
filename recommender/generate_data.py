@@ -12,31 +12,35 @@ from sklearn.metrics.pairwise import cosine_similarity
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+# Keep the artifact beside the application, regardless of the working directory
+# used to launch this script or the Streamlit server.
 DATA_PATH = PROJECT_ROOT / 'data/matrices.pkl'
 
 
 def download():
     '''Get Movie Lens dataset'''
 
-    # Use Python's requests library to get zip archive of data
+    # Download the archive into memory so pandas can read its files directly
+    # without extracting the full MovieLens distribution to disk.
     url = 'https://files.grouplens.org/datasets/movielens/ml-100k.zip'
     response = requests.get(url)
 
-    # Create read-only zipfile object in memory from response content
+    # Create a read-only zipfile object over the downloaded bytes.
     return zipfile.ZipFile(io.BytesIO(response.content))
 
 
 def load(z):
     '''Loads data from zip archive'''
 
-    # Load ratings
+    # Ratings describe explicit user preference. Timestamps are unnecessary for
+    # this item-similarity demonstration, so remove them after loading.
     ratings = pd.read_csv(
         z.open('ml-100k/u.data'),
         sep='\t',
         names=['user_id', 'movie_id', 'rating', 'timestamp']
     ).drop(columns=['timestamp'])
 
-    # Load genre/name list
+    # The genre file defines the order of binary genre columns in u.item.
     genre_names = pd.read_csv(
         z.open('ml-100k/u.genre'),
         sep='|',
@@ -44,7 +48,8 @@ def load(z):
         encoding='latin-1'
     )['genre'].tolist()
 
-    # Load movie data
+    # Keep each movie's ID, display title, and genre flags for later lookup and
+    # content-based similarity calculation.
     movie_cols = ['movie_id', 'title', 'release_date', 'video_release', 'imdb_url'] + genre_names
 
     movies = pd.read_csv(
@@ -65,7 +70,8 @@ def load(z):
 def build(ratings, genre_names, movies):
     '''Builds user-item and item-item matricies'''
 
-    # Make user-item matrix (rows = users, columns = movies)
+    # Pivot ratings into the matrix where every row is a user and every column
+    # is a movie. Missing values mean the user has not rated that movie.
     print('Building user-item matrix... ', end='')
     user_item_matrix = ratings.pivot_table(
         index='user_id',
@@ -74,11 +80,12 @@ def build(ratings, genre_names, movies):
     )
     print('Done.')
 
-    # Fill unrated entries with 0 for cosine similarity
+    # Cosine similarity requires numeric vectors. Zero represents an unrated
+    # movie while preserving the original NaN matrix for other use cases.
     user_item_filled = user_item_matrix.fillna(0)
 
-    # Make item-item similarity matrix
-    # Transpose so items are rows, then compute pairwise cosine similarity
+    # Transpose so each movie is a vector of user ratings. The resulting matrix
+    # lets the app look up collaborative similarity by movie ID.
     print('Building item-item similarity matrix... ', end='')
     item_similarity = cosine_similarity(user_item_filled.T)
 
@@ -89,7 +96,8 @@ def build(ratings, genre_names, movies):
     )
     print('Done.')
 
-    # Build genre feature matrix (rows = movies, columns = genres)
+    # Each movie is also represented by its binary genre flags. Cosine
+    # similarity over these vectors supplies the content-based signal.
     print('Building genre similarity matrix... ', end='')
     genre_matrix = movies[genre_names].values
     genre_similarity = cosine_similarity(genre_matrix)
@@ -107,6 +115,8 @@ def build(ratings, genre_names, movies):
 def main():
     '''Runs the data generation'''
 
+    # Build the inputs once, then package only what the web app needs at run
+    # time. This keeps the Streamlit startup path independent of the download.
     z = download()
     ratings, genre_names, movies = load(z)
     item_similarity_df, genre_similarity_df = build(
@@ -128,8 +138,10 @@ def generate_data():
     '''Build and save the recommendation data artifact.'''
 
     result = main()
+    # A fresh clone has no data directory, so create it before opening the file.
     DATA_PATH.parent.mkdir(parents=True, exist_ok=True)
 
+    # Pickle preserves pandas indexes and labels used for movie-ID lookups.
     with open(DATA_PATH, 'wb') as file:
         pickle.dump(result, file)
 
