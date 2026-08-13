@@ -68,7 +68,7 @@ def load(z):
 
 
 def build(ratings, genre_names, movies):
-    '''Builds user-item and item-item matricies'''
+    '''Builds user-item and item-item matrices'''
 
     # Pivot ratings into the matrix where every row is a user and every column
     # is a movie. Missing values mean the user has not rated that movie.
